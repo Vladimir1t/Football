@@ -15,6 +15,24 @@ services:
       timeout: 3s
       retries: 10
 
+  # Пайплайн в контейнере поверх Postgres:
+  #   docker compose run --rm pipeline generate
+  #   docker compose run --rm pipeline run
+  # Поставки и отчёты появляются в ./data на хосте.
+  pipeline:
+    build: .
+    image: football-dq
+    profiles: ["pipeline"]
+    environment:
+      FDQ_DB_URL: postgresql://fdq:fdq@postgres:5432/fdq
+      FDQ_TELEGRAM_TOKEN: ${FDQ_TELEGRAM_TOKEN:-}
+      FDQ_TELEGRAM_CHAT_ID: ${FDQ_TELEGRAM_CHAT_ID:-}
+    volumes:
+      - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # BI для витрин и дашборда «здоровья данных»: docker compose --profile bi up -d
   metabase:
     image: metabase/metabase:latest
