@@ -1,0 +1,69 @@
+name: ci
+
+on:
+  push:
+    branches-ignore: [main] 
+  pull_request:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.13"] # 3.10 ставит pandas 2, 3.13 — pandas 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -t . -v
+      - name: Pipeline smoke run (SQLite)
+        run: |
+          python -m fdq generate
+          python -m fdq run
+          test -s reports/dq_report.md
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fdq
+          POSTGRES_PASSWORD: fdq
+          POSTGRES_DB: fdq
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fdq" --health-interval 5s
+          --health-timeout 3s --health-retries 10
+    env:
+      FDQ_DB_URL: postgresql://fdq:fdq@localhost:5432/fdq
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements-postgres.txt
+      - name: Pipeline on PostgreSQL
+        run: |
+          python -m fdq generate
+          python -m fdq run
+          test -s reports/dq_report.md
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t football-dq:ci .
+      - name: Pipeline in the container
+        run: |
+          mkdir -p out
+          fdq() { docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/out:/data" football-dq:ci "$@"; }
+          fdq generate
+          fdq run
+          test -s out/reports/dq_report.md

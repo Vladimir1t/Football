@@ -1,0 +1,51 @@
+name: nightly-dq
+
+# Ежедневный запуск опубликованного образа (:latest из cd.yml), как в проде:
+
+on:
+  schedule:
+    - cron: "17 4 * * *" # 07:17 по Москве
+  workflow_dispatch:
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run the pipeline
+        env:
+          FDQ_TELEGRAM_TOKEN: ${{ secrets.FDQ_TELEGRAM_TOKEN }}
+          FDQ_TELEGRAM_CHAT_ID: ${{ secrets.FDQ_TELEGRAM_CHAT_ID }}
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:latest"
+          mkdir -p out
+          fdq() {
+            docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/out:/data" \
+              -e FDQ_TELEGRAM_TOKEN -e FDQ_TELEGRAM_CHAT_ID "$IMAGE" "$@"
+          }
+          fdq generate --seed "$GITHUB_RUN_NUMBER" # каждую ночь новые данные
+          fdq run
+      - name: Report to the run summary
+        if: always()
+        run: |
+          if [ -f out/reports/dq_report.md ]; then
+            cat out/reports/dq_report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Отчёт не создан: пайплайн упал раньше, см. лог." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dq-report-${{ github.run_number }}
+          path: |
+            out/reports/
+            out/fdq.db
+          retention-days: 14
+          if-no-files-found: ignore
