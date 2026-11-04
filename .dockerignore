@@ -8,5 +8,4 @@ reports
 docs
 tests
 *.pdf
-.DS_Store
 .env
