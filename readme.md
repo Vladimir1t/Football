@@ -71,7 +71,7 @@ Python ≥ 3.10. База по умолчанию — SQLite, ничего ст�
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-python -m fdq generate          # синтетические поставки в data/raw
+python -m fdq generate          # тестовые валидные и невалидные данные в data/raw
 python -m fdq run               # extract → transform → витрины → проверки → reports/dq_report.md
 python -m unittest discover -s tests -t .
 ```
@@ -96,12 +96,6 @@ SQL написан переносимым: на PostgreSQL 16 пайплайн �
 тесты — на SQLite, в CI есть отдельный прогон на Postgres. Для дашборда: `docker compose --profile bi up -d` поднимает Metabase на
 http://localhost:3000; DataLens подключается к тому же Postgres.
 
-### Алерты
-
-```bash
-export FDQ_TELEGRAM_TOKEN=...      # токен бота
-export FDQ_TELEGRAM_CHAT_ID=...
-```
 
 ## Модель данных
 
